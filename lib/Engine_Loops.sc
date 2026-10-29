@@ -25,8 +25,10 @@ Engine_Loops : CroneEngine {
     // held for `dur`, then damped over `rel` (dur 0 = ring out fully)
     SynthDef(\loops_rhodes, { arg out, rev, tape, vib, buf, rate = 1, amp = 0.5, pan = 0, send = 0.5,
         dur = 0, rel = 0.8;
-      var damp = Select.kr(dur > 0, [DC.kr(1),
-        EnvGen.kr(Env([1, 1, 0], [dur.max(0.01), rel], [0, -3]), doneAction: 2)]);
+      // (dur 0: hold for 60 s, long after the sample has ended; Select would run
+      // both branches, so a short damper would cut every note)
+      var hold = Select.kr(dur > 0, [60, dur]);
+      var damp = EnvGen.kr(Env([1, 1, 0], [hold, rel.max(0.05)], [0, -3]), doneAction: 2);
       var sig = PlayBuf.ar(1, buf, BufRateScale.kr(buf) * rate, doneAction: 2) * amp * damp;
       var m = In.kr(vib);
       sig = Pan2.ar(sig, pan) * [1 + m, 1 - m];
