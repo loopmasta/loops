@@ -4,13 +4,22 @@ engine.name = 'Loops'
 
 local MAX_VOICES = 8
 local NOTE_NAMES = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"}
+-- the modes first, in their order (by the degree of the major scale they start
+-- on), then the five-note scales, then the others
 local SCALES = {
-  {name = "major pent", iv = {0, 2, 4, 7, 9}},
-  {name = "lydian", iv = {0, 2, 4, 6, 7, 9, 11}},
-  {name = "major", iv = {0, 2, 4, 5, 7, 9, 11}},
+  {name = "ionian", iv = {0, 2, 4, 5, 7, 9, 11}},
   {name = "dorian", iv = {0, 2, 3, 5, 7, 9, 10}},
+  {name = "lydian", iv = {0, 2, 4, 6, 7, 9, 11}},
+  {name = "major pent", iv = {0, 2, 4, 7, 9}},
   {name = "minor pent", iv = {0, 3, 5, 7, 10}},
+  {name = "hirajoshi", iv = {0, 2, 3, 7, 8}},
+  {name = "kumoi", iv = {0, 2, 3, 7, 9}},
+  {name = "airports", iv = {0, 3, 7, 8, 10}}, -- Eno's Music for Airports 2/1 (F Ab C Db Eb in key F)
+  {name = "melodic minor", iv = {0, 2, 3, 5, 7, 9, 11}},
+  {name = "harmonic minor", iv = {0, 2, 3, 5, 7, 8, 11}},
+  {name = "whole tone", iv = {0, 2, 4, 6, 8, 10}},
 }
+local DEFAULT_SCALE = 4 -- major pent
 local LOW, HIGH = 53, 81 -- the notes' register: F3 .. A5
 local FLASH = 1.5        -- seconds a circle stays lit after its note
 local VELOCITY = 0.5     -- the notes' middle level (the dynamics spread around it)
@@ -246,7 +255,7 @@ local function add_params()
   params:set_action("root", function() renew() end)
   local names = {}
   for i, s in ipairs(SCALES) do names[i] = s.name end
-  params:add_option("scale", "scale", names, 1)
+  params:add_option("scale", "scale", names, DEFAULT_SCALE)
   params:set_action("scale", function() renew() end)
   params:add_control("vibrato", "vibrato", controlspec.new(0, 1, "lin", 0, 0.5, ""))
   params:set_action("vibrato", function(x) engine.vibrato(x) end)

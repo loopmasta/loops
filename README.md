@@ -33,7 +33,7 @@ each loop's level and speed also drift slowly, and the whole piece breathes over
 
 PARAMS > loops has what the controls don't set:
 
-- **key**, **scale** (major pentatonic, lydian, major, dorian, minor pentatonic): a change makes a new set of loops
+- **key**, **scale** (the modes ionian, dorian, lydian; the five-note scales major pentatonic (default), minor pentatonic, hirajoshi, kumoi and airports (the notes of Eno's *Music for Airports 2/1*: with key F the original pitches); melodic minor, harmonic minor, whole tone): a change makes a new set of loops
 - **vibrato**, **vibrato rate**: the Rhodes' stereo tremolo (default 50 %, 2.5 Hz)
 - **tape**, **tape time**, **tape feedback**, **tape wear**: the tape delay. every repeat goes through the same tape faults again (lost highs and lows, saturation, wow and flutter, dropouts, hiss), so the echoes wear more with each pass. turn up `tape feedback` and `tape wear` to hear them dissolve
 
