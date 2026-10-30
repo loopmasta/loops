@@ -10,7 +10,7 @@ the idea comes from Eno's tape loops (each of a different length, each carrying 
 
 ## requirements
 
-- norns (made on a Raspberry Pi 4, norns 2.9.4)
+- norns (made on a Raspberry Pi 4, shieldXL, norns 2.9.4)
 - the jRhodes3d samples (see install), about 22 MB
 
 ## documentation
