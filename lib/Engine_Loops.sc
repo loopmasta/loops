@@ -21,9 +21,15 @@ Engine_Loops : CroneEngine {
     // one sample of the jRhodes3d set (a 1977 Rhodes Mark I by Jeff Learman, samples
     // CC BY-NC 4.0, music made with it CC0), transposed by `rate`, ringing out fully.
     // the vibrato is a stereo tremolo, as in a Suitcase Rhodes: the sound swings
-    // between left and right with the shared LFO on `vib` (already scaled by depth)
-    SynthDef(\loops_rhodes, { arg out, rev, tape, vib, buf, rate = 1, amp = 0.5, pan = 0, send = 0.5;
-      var sig = PlayBuf.ar(1, buf, BufRateScale.kr(buf) * rate, doneAction: 2) * amp;
+    // between left and right with the shared LFO on `vib` (already scaled by depth).
+    // held for `dur` seconds, then damped over 0.6 s; dur 0 rings out fully (the
+    // damper then holds for 60 s, long after the sample has ended: Select picks a
+    // value here, not an envelope, so it can't cut a ringing note)
+    SynthDef(\loops_rhodes, { arg out, rev, tape, vib, buf, rate = 1, amp = 0.5, pan = 0, send = 0.5,
+        dur = 0;
+      var hold = Select.kr(dur > 0, [60, dur]);
+      var damp = EnvGen.kr(Env([1, 1, 0], [hold, 0.6], [0, -3]), doneAction: 2);
+      var sig = PlayBuf.ar(1, buf, BufRateScale.kr(buf) * rate, doneAction: 2) * amp * damp;
       var m = In.kr(vib);
       sig = Pan2.ar(sig, pan) * [1 + m, 1 - m];
       Out.ar(out, sig);
@@ -99,16 +105,18 @@ Engine_Loops : CroneEngine {
     fxSynth = Synth.new(\loops_fx, [\out, out, \rev, revBus.index], fx);
     tapeSynth = Synth.new(\loops_tape, [\out, out, \rev, revBus.index, \in, tapeBus.index], fx, \addToHead);
 
-    // note(note, amp, pan): a Rhodes note, the nearest sample transposed, the
-    // velocity layer from the level
-    this.addCommand("note", "fff", { arg msg;
+    // note(note, amp, pan, dur, gain): a Rhodes note, the nearest sample transposed,
+    // the velocity layer from amp; held for dur seconds (0 = ring out); gain (0..1)
+    // only sets the volume (a fading loop gets quieter, its timbre stays)
+    this.addCommand("note", "fffff", { arg msg;
       var note = msg[1], amp = msg[2];
       if(rhodes.size > 0, {
         var centre = rhodes.keys.asArray.minItem({ arg k; (k - note).abs });
         var vel = (amp * 127).clip(1, 127);
         var layer = case { vel < 48 } { 5 } { vel < 73 } { 4 } { vel < 96 } { 3 } { vel < 112 } { 2 } { 1 };
         Synth.new(\loops_rhodes, [\out, out, \rev, revBus.index, \tape, tapeBus.index, \vib, vibBus.index, \buf, rhodes[centre][layer],
-          \rate, (note - centre).midiratio, \amp, amp.sqrt * 0.4, \pan, msg[3]], voices);
+          \rate, (note - centre).midiratio, \amp, amp.sqrt * 0.4 * msg[5].clip(0, 1), \pan, msg[3],
+          \dur, msg[4]], voices);
       });
     });
 
