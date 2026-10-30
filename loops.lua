@@ -5,7 +5,7 @@
 -- on its own loop length
 --
 -- K3 play / stop, K2 new loops
--- E2 voices, E3 space
+-- E2 voices, E3 speed spread
 
 engine.name = 'Loops'
 
@@ -22,7 +22,10 @@ local LOW, HIGH = 53, 81 -- the notes' register: F3 .. A5
 local FLASH = 1.5        -- seconds a circle stays lit after its note
 local VELOCITY = 0.5     -- the notes' middle level (the dynamics spread around it)
 
-local voices = {}        -- {notes = {...}, len = s, offset = s, vel = 0..1, started, last}
+-- the voices: notes (1 or 2), gap (s before the 2nd), len (s), spread (speed
+-- factor), offset (s), vel (0..1), pan, swell_period / swell_phase; while playing
+-- last (time of the last note), cur (this pass's length), next (time of the next)
+local voices = {}
 local running = false
 local clocks = {}
 local message, message_until = nil, 0
@@ -88,13 +91,26 @@ local function new_loops()
     v.swell_phase = r.f() * 2 * math.pi
     voices[i] = v
   end
+  -- each voice's own speed factor for `spread`: spread evenly (log scale, a little
+  -- jitter) from 4x faster to 3x slower and shuffled among the voices, so at full
+  -- spread the loops always range from fast to slow and no two are alike. drawn
+  -- after everything else, so spread 0 keeps the loops exactly as they were
+  local lo, hi = math.log(0.25), math.log(3)
+  local factors = {}
+  for k = 1, #voices do
+    factors[k] = math.exp(lo + (k - 1 + 0.2 + 0.6 * r.f()) / #voices * (hi - lo))
+  end
+  for k = #factors, 2, -1 do
+    local j = r.int(1, k)
+    factors[k], factors[j] = factors[j], factors[k]
+  end
+  for k, v in ipairs(voices) do v.spread = factors[k] end
 end
 
 -- the level of a note: the voice's own level, its slow swell (40-90 s), the
 -- whole piece breathing (about 2 minutes) and a little variation every time,
--- together a factor around 1. `dynamics` scales how far it strays from 1
--- (0 = every note the same, 1 = as is, 2 = exaggerated) around VELOCITY. with the sampled Rhodes the level also sets the timbre (soft = warm,
--- loud = bark)
+-- together a factor around 1, times VELOCITY. with the sampled Rhodes the level
+-- also sets the timbre (soft = warm, loud = bark)
 local function dynamics(v)
   local t = util.time()
   local voice = v.vel / 0.475 -- the voice's level, around 1
@@ -102,20 +118,26 @@ local function dynamics(v)
   local piece = 0.85 + 0.2 * math.sin(2 * math.pi * t / 127)
   local each = 0.85 + 0.3 * math.random()
   local f = voice * own * piece * each / 0.75 -- around 1
-  local range = params:get("dynamics")
-  return util.clamp(VELOCITY * (1 + (f - 1) * range), 0.05, 1)
+  return util.clamp(VELOCITY * f, 0.05, 1)
 end
 
 local function play_voice(v)
   local vel = dynamics(v)
-  engine.note(v.notes[1], vel, v.pan, 0, 0) -- 0: the note rings out fully
+  engine.note(v.notes[1], vel, v.pan)
   v.last = util.time()
   if v.notes[2] then
     clock.run(function()
       clock.sleep(v.gap)
-      engine.note(v.notes[2], vel * (0.75 + 0.2 * math.random()), v.pan, 0, 0)
+      -- not after a stop in the meantime
+      if running then engine.note(v.notes[2], vel * (0.75 + 0.2 * math.random()), v.pan) end
     end)
   end
+end
+
+-- a voice's loop length now: its length, moved towards its own speed factor as
+-- `spread` goes from 0 (the lengths as drawn) to 1 (a few seconds .. over a minute)
+local function length(v)
+  return util.clamp(v.len * v.spread ^ params:get("spread"), 3, 90)
 end
 
 local function stop()
@@ -128,13 +150,15 @@ local function start()
   stop()
   running = true
   for i, v in ipairs(voices) do
-    v.started = util.time() + v.offset
-    v.last = nil
+    v.last, v.next, v.cur = nil, nil, nil
     clocks[#clocks + 1] = clock.run(function()
       clock.sleep(v.offset)
       while true do
         if i <= params:get("voices") then play_voice(v) end
-        clock.sleep(v.len)
+        -- the length is read for every pass, so spread changes apply smoothly
+        v.cur = length(v)
+        v.next = util.time() + v.cur
+        clock.sleep(v.cur)
       end
     end)
   end
@@ -164,7 +188,6 @@ local function add_params()
   params:set_action("vibrato", function(x) engine.vibrato(x) end)
   params:add_control("vibrato_rate", "vibrato rate", controlspec.new(1, 10, "exp", 0, 2.5, "Hz"))
   params:set_action("vibrato_rate", function(x) engine.vibrato_rate(x) end)
-  params:add_control("dynamics", "dynamics", controlspec.new(0, 2, "lin", 0, 1, ""))
   params:add_control("tape", "tape", controlspec.new(0, 1, "lin", 0, 0.4, ""))
   params:set_action("tape", function(x) engine.tape(x) end)
   params:add_control("tape_time", "tape time", controlspec.new(0.1, 2.5, "exp", 0, 0.85, "s"))
@@ -173,16 +196,14 @@ local function add_params()
   params:set_action("tape_feedback", function(x) engine.tape_feedback(x) end)
   params:add_control("tape_wear", "tape wear", controlspec.new(0, 1, "lin", 0, 0.5, ""))
   params:set_action("tape_wear", function(x) engine.tape_wear(x) end)
-  params:add_control("space", "space", controlspec.new(0, 1, "lin", 0, 0.8, ""))
-  params:set_action("space", function(x) engine.space(x) end)
+  params:add_control("spread", "speed spread", controlspec.new(0, 1, "lin", 0, 0, ""))
 end
 
 -- norns ---------------------------------------------------------------------------
 
 function init()
   add_params()
-  params:bang()
-  new_loops()
+  params:bang() -- the key, scale and seed actions make the first set of loops
   -- call redraw through a function: norns swaps the global redraw while it loads
   redraw_metro = metro.init(function() redraw() end, 1 / 30)
   redraw_metro:start()
@@ -203,8 +224,8 @@ function enc(n, d)
     params:delta("voices", d)
     show(params:get("voices") .. " voices")
   elseif n == 3 then
-    params:delta("space", d)
-    show("space " .. math.floor(params:get("space") * 100 + 0.5) .. "%")
+    params:delta("spread", d)
+    show("spread " .. math.floor(params:get("spread") * 100 + 0.5) .. "%")
   end
 end
 
@@ -239,11 +260,11 @@ function redraw()
     screen.level(active and math.floor(3 + 12 * lit + 0.5) or 1)
     circle(cx, cy, 12)
     if active then
-      screen.level(active and (lit > 0 and 15 or 5) or 1)
+      screen.level(lit > 0 and 15 or 5)
       screen.move(cx - math.floor(screen.text_extents(note_name(v.notes[1])) / 2), cy + 3)
       screen.text(note_name(v.notes[1]))
-      if running and v.started and now >= v.started then
-        local phase = ((now - v.started) % v.len) / v.len
+      if running and v.next and v.cur then
+        local phase = util.clamp(1 - (v.next - now) / v.cur, 0, 1)
         local a = phase * 2 * math.pi - math.pi / 2
         screen.level(12)
         screen.rect(math.floor(cx + math.cos(a) * 12) - 1, math.floor(cy + math.sin(a) * 12) - 1, 3, 3)
