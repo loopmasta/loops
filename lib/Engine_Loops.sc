@@ -69,9 +69,10 @@ Engine_Loops : CroneEngine {
 
     server.sync;
 
-    // the Rhodes samples (shared with miles): A_<note>__<name>_<layer>.flac, read up to 10 s
+    // the Rhodes samples in dust/audio/loops/jRhodes3d-mono/: A_<note>__<name>_<layer>.flac,
+    // read up to 10 s
     rhodes = Dictionary.new;
-    PathName("~/dust/audio/miles/jRhodes3d-mono/".standardizePath).files.do({ arg f;
+    PathName("~/dust/audio/loops/jRhodes3d-mono/".standardizePath).files.do({ arg f;
       var parts = f.fileNameWithoutExtension.split($_);
       var note = parts[1].asInteger;
       var layer = parts.last.asInteger;
