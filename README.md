@@ -59,7 +59,7 @@ cd /tmp && rm -rf jrhodes
 
 the samples end up in `dust/audio/loops/jRhodes3d-mono/`. loops brings its own SuperCollider engine (`lib/Engine_Loops.sc`): after installing, **restart norns once** (SYSTEM > RESTART), so SuperCollider picks it up.
 
-`select.png` is a background for the SELECT preview. stock norns doesn't show it: it needs a small patch to norns' preview menu (see [shieldxl-trixie](https://github.com/loopmasta/shieldxl-trixie)), so it's optional.
+`select.png` is a background for the SELECT preview. stock norns doesn't show it: it needs a small patch to norns' preview menu (see [shieldXL-trixie](https://github.com/loopmasta/shieldXL-trixie)), so it's optional.
 
 ## credits
 
